@@ -30,7 +30,7 @@ Ensure the file `strategy_returns.csv` is placed in the project directory. This 
 
 ### Step 4: Run the Streamlit App
 ```bash
-streamlit run app.py
+streamlit run main.py
 ```
 
 ## CSV File Format
