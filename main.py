@@ -13,61 +13,88 @@ page = st.sidebar.radio("Go to:", ["Strategy Correlation Dashboard", "Monte Carl
 # Load precomputed strategy data
 @st.cache_data
 def load_data():
-    df = pd.read_csv("strategy_returns.csv", index_col=0)  # Read the pre-stored 5 strategies
+    df = pd.read_csv("strategy_returns.csv",
+                     index_col=0)  # Read the pre-stored 5 strategies
     return df
+
 
 # Compute correlation matrix
 def compute_correlation_matrix(df):
     return df.corr()
 
+
 # Function to plot heatmap (Lower Triangular with Diagonal)
 def plot_heatmap(corr_matrix, title):
-    mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)  # Keeps diagonal
+    # If only one row, don't use a mask
+    if corr_matrix.shape[0] == 1:
+        mask = None
+    else:
+        mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(corr_matrix, mask=mask, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
+    sns.heatmap(corr_matrix,
+                mask=mask,
+                annot=True,
+                cmap="coolwarm",
+                fmt=".2f",
+                linewidths=0.5)
     plt.title(title)
-    st.pyplot(fig)  # Display the heatmap in Streamlit
-
+    st.pyplot(fig)
 # --- PAGE 1: STRATEGY CORRELATION DASHBOARD ---
 if page == "Strategy Correlation Dashboard":
-    st.title("Strategy Correlation Dashboard")
+            df = load_data()
+            precomputed_corr = compute_correlation_matrix(df)
 
-    # Load initial data and compute correlation
-    df = load_data()
-    precomputed_corr = compute_correlation_matrix(df)
+            # Streamlit App UI
+            st.title("Strategy Correlation Dashboard")
 
-    # Section 1: Display Precomputed Correlation Heatmap
-    st.subheader("Precomputed Correlation Heatmap of 5 Strategies")
-    plot_heatmap(precomputed_corr, "Correlation Heatmap of 5 Strategies")
+            # Section 1: Display Precomputed Correlation Heatmap
+            st.subheader("Precomputed Correlation Heatmap of 5 Strategies")
+            plot_heatmap(precomputed_corr, "Correlation Heatmap of 5 Strategies")
 
-    # Section 2: Upload New Strategy
-    st.subheader("Upload a New Strategy CSV File")
-    uploaded_file = st.file_uploader("Upload a CSV file (Date as first column, returns as second column)", type=["csv"])
+            # Section 2: Upload New Strategy
+            st.subheader("Upload a New Strategy CSV File")
+            uploaded_file = st.file_uploader(
+                "Upload a CSV file (Date as first column, returns as second column)",
+                type=["csv"])
 
-    if uploaded_file is not None:
-        new_strategy_df = pd.read_csv(uploaded_file, index_col=0)  # Read new strategy data
+            if uploaded_file is not None:
+                new_strategy_df = pd.read_csv(uploaded_file,
+                                              index_col=0)  # Read new strategy data
 
-        # Ensure the new strategy has only one column
-        if new_strategy_df.shape[1] != 1:
-            st.error("Please upload a CSV file with exactly one strategy column (besides the Date column).")
-        else:
-            new_strategy_name = new_strategy_df.columns[0]  # Extract new strategy name
+                # Ensure the new strategy has only one column
+                if new_strategy_df.shape[1] != 1:
+                    st.error(
+                        "Please upload a CSV file with exactly one strategy column (besides the Date column)."
+                    )
+                else:
+                    new_strategy_name = new_strategy_df.columns.tolist(
+                    )  # Extract new strategy name
+                    df = df.reset_index(drop=True).iloc[:1000]
+                    new_strategy_df = new_strategy_df.reset_index(drop=True).iloc[:1000]
+                    # Combine old and new strategies
+                    combined_df = pd.concat(
+                        [df, new_strategy_df],
+                        axis=1).dropna()  # Merge & handle missing values
 
-            # Combine old and new strategies
-            combined_df = pd.concat([df, new_strategy_df], axis=1).dropna()  # Merge & handle missing values
+                    # Compute new correlation matrix (only for new strategy vs old ones)
+                    new_correlation_matrix = combined_df.corr()
 
-            # Compute new correlation matrix (only for new strategy vs old ones)
-            new_correlation = combined_df.corr().loc[new_strategy_name, df.columns]  # Extract new strategy correlations
+                    # Extract correlations of the new strategy with existing ones
+                    new_corr_values = new_correlation_matrix.loc[new_strategy_name, :]
 
-            # Convert to DataFrame for heatmap
-            new_corr_matrix = pd.DataFrame(new_correlation).T
+                    # Convert to DataFrame
+                    new_corr_matrix = pd.DataFrame(new_corr_values).T
 
-            # Display new strategy correlation values
-            st.subheader(f"Correlation of '{new_strategy_name}' with Existing Strategies")
-            st.dataframe(new_corr_matrix)  # Show correlation table
+                    # Display new strategy correlation values
+                    st.subheader(
+                        f"Correlation of '{new_strategy_name}' with Existing Strategies")
+                    st.dataframe(new_corr_matrix)  # Show correlation table
 
-            # Plot heatmap for new strategy correlation
-            plot_heatmap(new_corr_matrix, f"Correlation Heatmap: {new_strategy_name} vs Existing Strategies")
+                    # Plot heatmap for new strategy correlation
+                    plot_heatmap(
+                        new_corr_matrix,
+                        f"Correlation Heatmap: {new_strategy_name} vs Existing Strategies")
+
 
 # --- PAGE 2: MONTE CARLO SIMULATION ---
 elif page == "Monte Carlo Simulation":
